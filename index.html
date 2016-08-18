@@ -1,0 +1,128 @@
+<html>
+
+<head>
+<title>Wikipedia API Connector</title>
+<meta http-equiv="Cache-Control" content="no-store" />
+
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js" type="text/javascript"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" crossorigin="anonymous"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script src="https://connectors.tableau.com/libs/tableauwdc-2.0.0-beta.js" type="text/javascript"></script>
+<style>
+img {
+		display: block;
+		margin-left: auto;
+		margin-right: auto
+}
+form {
+	font-family: sans-serif;
+}
+p {
+	font-family: sans-serif;
+	font-weight: bold;
+
+}
+
+</style>
+<script type="text/javascript">
+(function () {
+
+	function buildURL(article, startdate, enddate) {
+		var url = 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/'+ article + '/daily/' + startdate +'/' + enddate;
+		return url;
+	}
+
+    var myConnector = tableau.makeConnector();
+
+    myConnector.getSchema = function (schemaCallback) {
+		var cols = [
+			{ id : "views", alias : "views", dataType : tableau.dataTypeEnum.float },
+			{ id : "article", alias : "article", dataType : tableau.dataTypeEnum.string },
+			{ id : "agent", alias : "agent", dataType : tableau.dataTypeEnum.string },
+			{ id : "Date", alias : "Date", dataType : tableau.dataTypeEnum.date },
+			{ id : "id", alias : "id", dataType : tableau.dataTypeEnum.float }
+		];
+
+		var tableInfo = {
+			id : "wikidata",
+			alias : "WikpediaData",
+			columns : cols
+		};
+
+		schemaCallback([tableInfo]);
+    };
+
+
+    myConnector.getData = function (table, doneCallback) {
+        var art = tableau.connectionData.split('|')[0];
+		var start = tableau.connectionData.split('|')[1];
+		var end = tableau.connectionData.split('|')[2];
+		var connectionUri = buildURL(art, start, end);
+
+		$.getJSON(connectionUri, function(resp) {
+			var feat = resp.items,
+			tableData = [];
+			console.log(resp);
+
+			// Iterate over the JSON object
+			for (var i = 0, len = feat.length; i < len; i++) {
+				tableData.push({
+					"views": feat[i].views,
+					"article": feat[i].article,
+					"agent": feat[i].agent,
+					"Date": feat[i].timestamp.slice(4,6)+"/"+feat[i].timestamp.slice(6,8)+"/"+feat[i].timestamp.slice(0,4),
+					"id": i
+				});
+			}
+
+			table.appendRows(tableData);
+			doneCallback();
+		});
+
+    };
+
+    tableau.registerConnector(myConnector);
+	$(document).ready(function () {
+		$("#submitButton").click(function () {
+			var article = $('#article').val().trim();
+			var startdate = $('#startdate').val().trim();
+			var enddate = $('#enddate').val().trim();
+
+			tableau.connectionName = "Wiki Search for " + article;
+			tableau.connectionData = article + "|" + startdate  + "|" + enddate;
+			tableau.submit();
+
+		});
+	});
+})();
+</script>
+</head>
+
+<body>
+<div>
+<img src="https://upload.wikimedia.org/wikipedia/en/6/6d/Wikipedia_Logo_Blue.jpg">
+</div>
+<br>
+<center><p>Wikipedia View API Connector v2</p></center>
+<div class="container container-table">
+	<div class="row vertical-center-row">
+		<form>
+			<div class="form-group">
+				<input class="form-control" align="center" type="text" id="article" placeholder="Article Name"/>
+			</div>
+			<div class="form-group">
+				<input class="form-control" align="center" type="text" id="startdate" placeholder="YYYYMMDD" value="20150101" />
+			</div>
+			<div class="form-group">
+				<input class="form-control" align="center" type="text" id="enddate" placeholder="YYYYMMDD" value="20180101" />
+			</div>
+			<div class="text-center col-md-4 col-md-offset-4">
+				<button type="button" id="submitButton" class="btn btn-success" style="margin: 10px;">Get View Data!</button>
+			</div>
+		</form>
+	</div>
+</div>
+</body>
+
+</html>
